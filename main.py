@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
-from numbers_parser import Document, Cell
+from numbers_parser import Document
 
 load_dotenv()
 
@@ -10,6 +10,7 @@ endpoint = os.getenv("endpoint")
 api_key = os.getenv("api_key")
 
 document_analysis_client = DocumentAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(api_key))
+
 invoice_path = "/Users/rejonasusan/Downloads/inv1.pdf"
 invo_sheet = "/Users/rejonasusan/Desktop/HPE/invo/invoices.numbers"
 
@@ -52,23 +53,22 @@ for idx, invoice in enumerate(invoices.documents):
     row = []
     vendor_name = invoice.fields.get("VendorName")
     if vendor_name:
-        print(f"Vendor Name: {vendor_name.value} (confidence: {vendor_name.confidence})")
         row.append(vendor_name.value if vendor_name else "")
-
     invoice_id = invoice.fields.get("InvoiceId")
     if invoice_id:
-        print(f"Invoice Id: {invoice_id.value} (confidence: {invoice_id.confidence})")
         row.append(invoice_id.value if invoice_id else "")
 
     invoice_date = invoice.fields.get("InvoiceDate")
     if invoice_date:
-        print(f"Invoice Date: {invoice_date.value} (confidence: {invoice_date.confidence})")
         row.append(invoice_date.value if invoice_date else "")
 
-    total_due = invoice.fields.get("TotalDue")
+    total_due = invoice.fields.get("AmountDue")
     if total_due:
-        print(f"Total Due: {total_due.value} (confidence: {total_due.confidence})")
         row.append(total_due.value if total_due else "")
+    
+    invoice_total = invoice.fields.get("InvoiceTotal")
+    if invoice_total:
+        row.append(invoice_total.value if vendor_name else "")
 
     for col_num, value in enumerate(row):
         table.write(empty_row, col_num, str(value))
