@@ -2,4 +2,6 @@ azure-ai-formrecognizer
 azure-core
 openpyxl (excel)
 numbers-parser (numbers)
+PyPDF2
+pillow
 
