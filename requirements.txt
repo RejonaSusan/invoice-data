@@ -4,4 +4,4 @@ openpyxl (excel)
 numbers-parser (numbers)
 PyPDF2
 pillow
-
+PyMuPDF
