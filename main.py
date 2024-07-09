@@ -3,10 +3,13 @@ from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
 import configparser
 from numbers_parser import Document
+import fitz
+from PIL import Image
 
-from utils.findinv import find_invoice_pg
+from utils.findinv import get_invoice_pg
 from utils.emptyrow import find_empty_row
 from utils.writeinv import write_invoices
+from utils.getimg import get_inv_img
 
 
 config = configparser.ConfigParser()
@@ -20,6 +23,12 @@ INV_PATH = config['Paths']['invoice_path']
 SHEET = config['Paths']['invo_sheet']
 INVOICE_FIELDS = config['InvoiceFields']['fields'].split(',')
 
+def is_pdf(file_path):
+    ext = file_path.split('.')[-1]
+    if(ext == "pdf"):
+        return True
+    return False
+
 def main():
 
     endpoint = ENDPOINT
@@ -30,7 +39,10 @@ def main():
     invoice_path = INV_PATH
     invo_sheet = SHEET
 
-    invoices_data = find_invoice_pg(invoice_path, document_analysis_client)
+    if is_pdf(invoice_path):
+        invoices_data = get_invoice_pg(invoice_path, document_analysis_client)
+    else:
+        invoices_data = get_inv_img(invoice_path, document_analysis_client)
 
     doc = Document("invoices.numbers")
     sheets = doc.sheets

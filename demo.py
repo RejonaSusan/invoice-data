@@ -1,147 +1,139 @@
-import os
-from dotenv import load_dotenv
-from azure.core.credentials import AzureKeyCredential
-from azure.ai.formrecognizer import DocumentAnalysisClient
-from numbers_parser import Document
-import PyPDF2
-from PyPDF2 import PdfWriter
-import tempfile
-from PIL import Image
-
-load_dotenv()
-
-endpoint = os.getenv("endpoint")
-api_key = os.getenv("api_key")
-
-document_analysis_client = DocumentAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(api_key))
-
-# invoice_path = "/Users/rejonasusan/Downloads/sampleinv.png"
-invoice_path = "/Users/rejonasusan/Downloads/jpginve (1).pdf"
-invo_sheet = "/Users/rejonasusan/Desktop/HPE/invo/invoices.numbers"
-
-def is_image(file_path):
-    try:
-        Image.open(file_path)
-        return True
-    except IOError:
-        return False
-
-def find_invoice_pages_in_pdf(pdf_path, client):
-    invoice_pages = []
-    reader = PyPDF2.PdfReader(pdf_path)
-    num_pages = len(reader.pages)
-
-    for page_number in range(num_pages):
-        writer = PdfWriter()
-        writer.add_page(reader.pages[page_number])
-        temp_pdf_path = tempfile.mktemp(suffix=".pdf")
-        with open(temp_pdf_path, "wb") as output_pdf:
-            writer.write(output_pdf)
-
-        with open(temp_pdf_path, "rb") as f:
-            poller = client.begin_analyze_document("prebuilt-invoice", document=f)
-            result = poller.result()
-
-        if result.documents:
-            for document in result.documents:
-                if document.doc_type == "invoice":
-                    invoice_pages.append(page_number + 1)
-                    break
-
-    return invoice_pages
-
-def find_invoice_pages(file_path, client):
-    if is_image(file_path):
-        with open(file_path, "rb") as f:
-            poller = client.begin_analyze_document("prebuilt-invoice", document=f)
-            result = poller.result()
-        return [1] if result.documents else []
-    else:
-        return find_invoice_pages_in_pdf(file_path, client)
-
-invoice_pages = find_invoice_pages(invoice_path, document_analysis_client)
-if not invoice_pages:
-    print("No invoices found in the document")
-else:
-    print(f"Invoices found on pages: {invoice_pages}")
-
-invoices_data = []
-if is_image(invoice_path):
-    with open(invoice_path, "rb") as f:
-        poller = document_analysis_client.begin_analyze_document("prebuilt-invoice", document=f)
-        result = poller.result()
-    invoices_data.extend(result.documents)
-else:
-    for page_number in invoice_pages:
-        writer = PdfWriter()
-        reader = PyPDF2.PdfReader(invoice_path)
-        writer.add_page(reader.pages[page_number - 1])
-        temp_pdf_path = tempfile.mktemp(suffix=".pdf")
-        with open(temp_pdf_path, "wb") as output_pdf:
-            writer.write(output_pdf)
-
-        with open(temp_pdf_path, "rb") as f:
-            poller = document_analysis_client.begin_analyze_document("prebuilt-invoice", document=f)
-            result = poller.result()
-        invoices_data.extend(result.documents)
-
-with open(invoice_path, "rb") as f:
-    invoice = f.read()
-
-def is_row_empty(table, row_index):
-    for col_index in range(table.num_cols):
-        cell = table.cell(row_index, col_index)
-        if cell and cell.value:
-            return False
-    return True
-
-headers = ["Vendor Name", "Invoice Id", "Invoice Date", "Total Due"]
-
-doc = Document(invo_sheet)
-sheets = doc.sheets
-tables = sheets[0].tables
-table = tables[0]
-rows = table.rows()
-
-empty_row = None
-for i in range(len(rows)):
-    if is_row_empty(table, i):
-        empty_row = i
-        break
-
-if empty_row is None:
-    empty_row = table.num_rows
-
-if empty_row == 0:
-    for col_num, header in enumerate(headers):
-        table.write(0, col_num, header)
-    empty_row += 1
-
-
-for idx, invoice in enumerate(invoices_data):
+for idx, invoice in enumerate(invoices.documents):
     row = []
+    print("--------Recognizing invoice #{}--------".format(idx + 1))
     vendor_name = invoice.fields.get("VendorName")
     if vendor_name:
         row.append(vendor_name.value if vendor_name else "")
+        
+    vendor_address = invoice.fields.get("VendorAddress")
+    if vendor_address:
+        row.append(vendor_address.value if vendor_name else "")
+
+    vendor_address_recipient = invoice.fields.get("VendorAddressRecipient")
+    if vendor_address_recipient:
+        row.append(vendor_address_recipient.value if vendor_name else "")
+
+    customer_name = invoice.fields.get("CustomerName")
+    if customer_name:
+        row.append(customer_name.value if vendor_name else "")
+
+    customer_id = invoice.fields.get("CustomerId")
+    if customer_id:
+        row.append(vendor_name.value if vendor_name else "")
+
+    customer_address = invoice.fields.get("CustomerAddress")
+    if customer_address:
+        row.append(customer_address.value if vendor_name else "")
+
+    customer_address_recipient = invoice.fields.get("CustomerAddressRecipient")
+    if customer_address_recipient:
+        row.append(customer_address_recipient.value if vendor_name else "")
+
     invoice_id = invoice.fields.get("InvoiceId")
     if invoice_id:
-        row.append(invoice_id.value if invoice_id else "")
+        row.append(invoice_id.value if vendor_name else "")
 
     invoice_date = invoice.fields.get("InvoiceDate")
     if invoice_date:
-        row.append(invoice_date.value if invoice_date else "")
-
-    total_due = invoice.fields.get("AmountDue")
-    if total_due:
-        row.append(total_due.value if (total_due) else "")
+        row.append(invoice_date.value if vendor_name else "")
 
     invoice_total = invoice.fields.get("InvoiceTotal")
     if invoice_total:
-        row.append(invoice_total.value if (invoice_total) else "")
+        row.append(invoice_total.value if vendor_name else "")
 
-    for col_num, value in enumerate(row):
-        table.write(empty_row, col_num, str(value))
-    empty_row += 1
+    due_date = invoice.fields.get("DueDate")
+    if due_date:
+        row.append(due_date.value if vendor_name else "")
 
-doc.save(invo_sheet)
-print("done")
+    purchase_order = invoice.fields.get("PurchaseOrder")
+    if purchase_order:
+        row.append(purchase_order.value if vendor_name else "")
+
+    billing_address = invoice.fields.get("BillingAddress")
+    if billing_address:
+        row.append(billing_address.value if vendor_name else "")
+
+    billing_address_recipient = invoice.fields.get("BillingAddressRecipient")
+    if billing_address_recipient:
+        row.append(billing_address_recipient.value if vendor_name else "")
+
+    shipping_address = invoice.fields.get("ShippingAddress")
+    if shipping_address:
+        row.append(shipping_address.value if vendor_name else "")
+
+    shipping_address_recipient = invoice.fields.get("ShippingAddressRecipient")
+    if shipping_address_recipient:
+        row.append(shipping_address_recipient.value if vendor_name else "")
+
+    for idx, item in enumerate(invoice.fields.get("Items").value):
+        item_description = item.value.get("Description")
+        if item_description:
+            row.append(item_description.value if vendor_name else "")
+
+        item_quantity = item.value.get("Quantity")
+        if item_quantity:
+            row.append(item_quantity.value if vendor_name else "")
+
+        unit = item.value.get("Unit")
+        if unit:
+            row.append(unit.value if vendor_name else "")
+
+        unit_price = item.value.get("UnitPrice")
+        if unit_price:
+            row.append(unit_price.value if vendor_name else "")
+
+        product_code = item.value.get("ProductCode")
+        if product_code:
+            row.append(product_code.value if vendor_name else "")
+
+        item_date = item.value.get("Date")
+        if item_date:
+            row.append(item_date.value if vendor_name else "")
+
+        tax = item.value.get("Tax")
+        if tax:
+            row.append(tax.value if vendor_name else "")
+
+        amount = item.value.get("Amount")
+        if amount:
+            row.append(amount.value if vendor_name else "")
+
+    subtotal = invoice.fields.get("SubTotal")
+    if subtotal:
+        row.append(subtotal.value if vendor_name else "")
+
+    total_tax = invoice.fields.get("TotalTax")
+    if total_tax:
+        row.append(total_tax.value if vendor_name else "")
+
+    previous_unpaid_balance = invoice.fields.get("PreviousUnpaidBalance")
+    if previous_unpaid_balance:
+        row.append(previous_unpaid_balance.value if vendor_name else "")
+
+    amount_due = invoice.fields.get("AmountDue")
+    if amount_due:
+        row.append(amount_due.value if vendor_name else "")
+
+    service_start_date = invoice.fields.get("ServiceStartDate")
+    if service_start_date:
+        row.append(service_start_date.value if vendor_name else "")
+
+    service_end_date = invoice.fields.get("ServiceEndDate")
+    if service_end_date:
+        row.append(service_end_date.value if vendor_name else "")
+
+    service_address = invoice.fields.get("ServiceAddress")
+    if service_address:
+        row.append(service_address.value if vendor_name else "")
+
+    service_address_recipient = invoice.fields.get("ServiceAddressRecipient")
+    if service_address_recipient:
+        row.append(service_address_recipient.value if vendor_name else "")
+
+    remittance_address = invoice.fields.get("RemittanceAddress")
+    if remittance_address:
+        row.append(remittance_address.value if vendor_name else "")
+
+    remittance_address_recipient = invoice.fields.get("RemittanceAddressRecipient")
+    if remittance_address_recipient:
+        row.append(remittance_address_recipient.value if vendor_name else "")

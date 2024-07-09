@@ -54,7 +54,7 @@ def process_page(doc, page, pg_num, client):
 
     return invoices_data
 
-def find_invoice_pg(pdf_path, client):
+def get_invoice_pg(pdf_path, client):
     doc = fitz.open(pdf_path)
     num_pages = len(doc)
     invoices_data = []
@@ -71,3 +71,6 @@ def find_invoice_pg(pdf_path, client):
 
     doc.close()
     return invoices_data
+
+
+    
