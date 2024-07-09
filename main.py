@@ -1,32 +1,36 @@
 import os
-from dotenv import load_dotenv
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
+import configparser
 from numbers_parser import Document
+
 from utils.findinv import find_invoice_pg
 from utils.emptyrow import find_empty_row
 from utils.writeinv import write_invoices
 
-load_dotenv()
+
+config = configparser.ConfigParser()
+config_path = os.path.join(os.path.dirname(__file__), "config/config.ini")
+config.read(config_path)
+
+
+ENDPOINT = config['Azure']['endpoint']
+KEY = config['Azure']['api_key']
+INV_PATH = config['Paths']['invoice_path']
+SHEET = config['Paths']['invo_sheet']
+INVOICE_FIELDS = config['InvoiceFields']['fields'].split(',')
 
 def main():
 
-    endpoint = os.getenv("endpoint")
-    api_key = os.getenv("api_key")
+    endpoint = ENDPOINT
+    api_key = KEY
 
     document_analysis_client = DocumentAnalysisClient(endpoint=endpoint, credential=AzureKeyCredential(api_key))
 
-    invoice_path = "/Users/rejonasusan/Downloads/jpginve (1)_merged_merged.pdf"
-    invo_sheet = "/Users/rejonasusan/Desktop/HPE/invo/invoices.numbers"
+    invoice_path = INV_PATH
+    invo_sheet = SHEET
 
-    invoices, invoices_data = find_invoice_pg(invoice_path, document_analysis_client)
-
-    if not invoices:
-        print("No invoices found in the document")
-    else:
-        print(f"Invoices found on pages: {invoices}")
-
-    headers = ["Vendor Name", "Invoice Id", "Invoice Date", "Total Due"]
+    invoices_data = find_invoice_pg(invoice_path, document_analysis_client)
 
     doc = Document("invoices.numbers")
     sheets = doc.sheets
@@ -34,10 +38,10 @@ def main():
     table = tables[0]
 
     empty_row = None
-    empty_row = find_empty_row(table, headers)
+    empty_row = find_empty_row(table, INVOICE_FIELDS)
 
     if empty_row == 0:
-        for col_num, header in enumerate(headers):
+        for col_num, header in enumerate(INVOICE_FIELDS):
             table.write(0, col_num, header)
         empty_row += 1
 

@@ -1,6 +1,5 @@
 import pytesseract
 from PIL import Image
-import io
 
 def extract_text_from_image(stream, num):
     img = Image.open(stream)
