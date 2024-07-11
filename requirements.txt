@@ -1,7 +1,6 @@
 azure-ai-formrecognizer
 azure-core
-numbers-parser
 pillow
 PyMuPDF
 pytesseract
-io
+openpyxl

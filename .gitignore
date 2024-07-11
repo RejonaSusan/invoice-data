@@ -1,4 +1,4 @@
 .env
-hpe/
+invo/
 invoices.numbers
 utils/__pycache__/
