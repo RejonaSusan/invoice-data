@@ -11,11 +11,9 @@ from utils.emptyrow import find_empty_row
 from utils.writeinv import write_invoices
 from utils.getimg import get_inv_img
 
-
 config = configparser.ConfigParser()
 config_path = os.path.join(os.path.dirname(__file__), "config/config.ini")
 config.read(config_path)
-
 
 ENDPOINT = config['Azure']['endpoint']
 KEY = config['Azure']['api_key']
@@ -25,9 +23,7 @@ INVOICE_FIELDS = config['InvoiceFields']['fields'].split(',')
 
 def is_pdf(file_path):
     ext = file_path.split('.')[-1]
-    if(ext == "pdf"):
-        return True
-    return False
+    return ext == "pdf"
 
 def main():
 
@@ -40,16 +36,15 @@ def main():
     invo_sheet = SHEET
 
     if is_pdf(invoice_path):
-        invoices_data = get_invoice_pg(invoice_path, document_analysis_client)
+        invoices_data = get_invoice_pg(invoice_path, document_analysis_client, pages=3)
     else:
         invoices_data = get_inv_img(invoice_path, document_analysis_client)
 
-    doc = Document("invoices.numbers")
+    doc = Document(invo_sheet)
     sheets = doc.sheets
     tables = sheets[0].tables
     table = tables[0]
 
-    empty_row = None
     empty_row = find_empty_row(table, INVOICE_FIELDS)
 
     if empty_row == 0:
