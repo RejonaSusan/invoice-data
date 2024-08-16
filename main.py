@@ -2,7 +2,7 @@ import os
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
 import configparser
-from numbers_parser import Document
+import openpyxl
 import fitz
 from PIL import Image
 
@@ -25,6 +25,7 @@ def is_pdf(file_path):
     ext = file_path.split('.')[-1]
     return ext == "pdf"
 
+
 def main():
 
     endpoint = ENDPOINT
@@ -40,22 +41,15 @@ def main():
     else:
         invoices_data = get_inv_img(invoice_path, document_analysis_client)
 
-    doc = Document(invo_sheet)
-    sheets = doc.sheets
-    tables = sheets[0].tables
-    table = tables[0]
+    wb = openpyxl.load_workbook(invo_sheet)
+    sheet = wb.active
+    sheet.title = "Invoice-sheet"
 
-    empty_row = find_empty_row(table, INVOICE_FIELDS)
+    empty_row = find_empty_row(sheet, INVOICE_FIELDS)
+    write_invoices(invoices_data, sheet, empty_row)
 
-    if empty_row == 0:
-        for col_num, header in enumerate(INVOICE_FIELDS):
-            table.write(0, col_num, header)
-        empty_row += 1
-
-    write_invoices(invoices_data, table, empty_row)
-
-    doc.save(invo_sheet)
-    print("done")
+    wb.save(invo_sheet)
+    print("Done")
 
 if __name__ == "__main__":
     main()
